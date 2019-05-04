@@ -26,6 +26,13 @@ void destroy_concurrency_mechanisms(){
     printf("------>destroy concurrency mechanisns ok \n");
 }
 
+// Extract information from data received in the pointer void * args 
+// Create the iterator on the batch file (new_iterator)
+// While there are pending file operations
+// Read a new operation from the file with the iterator (next_operation)
+// Create a new operation with the information returned by the file (new_operation)
+// Queue the new operation in the operation queue (enqueue_operation) 
+// Destroy the iterator (destroy_iterator)
 void* broker(void* args){
 
     // we declare the main data structures that the broker need to interact with
@@ -67,19 +74,23 @@ void* broker(void* args){
                 
             if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
                 return -1; // if it fails, we interrupt the program
-            sleep(2);
-            //*****************************+
-            //*****************************+ CRITICAL AREA FINISH
-            //*****************************+
+            sleep(2); // DEBUG ONLY
+            
             pthread_cond_signal(&cond);
             pthread_cond_signal(&cond2);
             pthread_mutex_unlock(&lock);
+            //*****************************+
+            //*****************************+ CRITICAL AREA FINISH
+            //*****************************+
             operation_check =  next_operation(_iterator, _operation->id, &_operation->type, &_operation->num_shares, &_operation->share_price);
         }
     }
     destroy_iterator(_iterator);
 }
-
+// Extract information from data received in the pointer void * args 
+// While the exit flag is not active
+// Dequeue operation from the operations queue (dequeue_operation) 
+// Processing the operation (process_operation)
 void* operation_executer(void* args){
 
     // we declare the main data structures that the broker need to interact with
