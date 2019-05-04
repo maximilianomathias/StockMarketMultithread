@@ -52,7 +52,7 @@ void* broker(void* args){
             // we wait while the queue is full. 
             while ( operations_queue_full(_stock_marquet->stock_operations) == 1 )
                 pthread_cond_wait(&BrokercCond,&lock);
-
+            printf("-----------------> THREAD ID BROKER : %lu\t, %s\n", pthread_self(), _operation->id);
             // Fill the queue with a new element in the back.
             if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
                 return -1;
@@ -99,7 +99,7 @@ void* operation_executer(void* args){
     pthread_mutex_lock(_operationExec->exit_mutex); // we lock this mutex in order to have one operation running at the time
     
     while(*exit_OpExe != 1){ // while tehe xit flag is not active
-        
+        printf("-----------------> THREAD ID PROCESS EXEC: %lu\n", pthread_self());
         pthread_mutex_unlock(_operationExec->exit_mutex);
         pthread_mutex_lock(&lock);
         
@@ -121,24 +121,50 @@ void* operation_executer(void* args){
     
     //When the flag exit is active, we have to close the Op_Ex,
     //Before closing, we need to process all operations remaining in the queue
-    /*
-    while(operations_queue_empty(_stock_marquetEx->stock_operations) == 0){
-        pthread_mutex_lock(&lock);
-        dequeue_operation(_stock_marquetEx->stock_operations, _operation);
-        if(operation_check == -1){
-            perror("Error in dequeue_operation()");
-            exit(-1);
-        }
-        proc_operation =  process_operation(_stock_marquetEx, _operation);
-        if(proc_operation == -1){
-            perror("Error in process_operation()");
-            exit(-1);
-        }
-        pthread_mutex_unlock(&lock);
-        }*/
+    
+    // while(operations_queue_empty(_stock_marquetEx->stock_operations) == 0){
+    //     pthread_mutex_lock(&lock);
+    //      printf("-----------------> THREAD  LOOPIN THE REST-------------------------------------------------------\n");
+    //     dequeue_operation(_stock_marquetEx->stock_operations, _operation);
+    //     if(operation_check == -1){
+    //         perror("Error in dequeue_operation()");
+    //         exit(-1);
+    //     }
+    //     proc_operation =  process_operation(_stock_marquetEx, _operation);
+    //     if(proc_operation == -1){
+    //         perror("Error in process_operation()");
+    //         exit(-1);
+    //     }
+    //     pthread_mutex_unlock(&lock);
+    //     }
 }//operation_executer
 
+void* stats_reader(void * args){
+    //variables
+    struct reader_info * reader = (reader_info*) args;
+    stock_market * curr_market = reader->market;
+    unsigned int freq = reader->frequency;
+    pthread_mutex_lock(reader->exit_mutex);
+    int* exitreader  = reader->exit;
+    while(*exitreader != 1){
+      pthread_mutex_unlock(reader->exit_mutex);
+      pthread_mutex_lock(&lock);
+      while(QueueBusy == 1){
+        pthread_cond_wait(&BrokercCond,&lock);
+      }
+      //readers = readers + 1;
+      pthread_mutex_unlock(&lock);
+      print_market_status(curr_market);
+      pthread_mutex_lock(&lock);
+      //readers = readers - 1;
+      pthread_cond_signal(&BrokercCond);
+      pthread_mutex_unlock(&lock);
+      usleep(freq);
+    }
 
+
+
+}
 // initialization of the mutex and condition variables
 void init_concurrency_mechanisms(){
     pthread_mutex_init(&lock, NULL);

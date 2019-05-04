@@ -28,11 +28,11 @@ int main(int argc, char * argv[]){
 	info_ex1.exit_mutex = &exit_mutex;
 	
 	// Init reader_info for the stats_reader thread
-	//reader_info info_re1;
-	//info_re1.market = &market_madrid;
-	//info_re1.exit = &exit;
-	//info_re1.exit_mutex = &exit_mutex;
-	//info_re1.frequency = 100000;
+	reader_info info_re1;
+	info_re1.market = &market_madrid;
+	info_re1.exit = &exit;
+	info_re1.exit_mutex = &exit_mutex;
+	info_re1.frequency = 100000;
 
 	
 	// Create broker and exec threads
@@ -41,11 +41,12 @@ int main(int argc, char * argv[]){
 	pthread_create(&(tid[2]), NULL, &broker, (void*) &info_b1);
 	pthread_create(&(tid[4]), NULL, &broker, (void*) &info_b1);
 
-	/*or(int i = 0; i < 10; i++){
-		pthread_create(&(tid[i]), NULL, &operation_executer, (void*) &info_ex1);
-	}*/
 	pthread_create(&(tid[3]), NULL, &operation_executer, (void*) &info_ex1);
 
+	pthread_create(&(tid[5]), NULL, &stats_reader, (void*) &info_re1);
+	pthread_create(&(tid[6]), NULL, &stats_reader, (void*) &info_re1);
+	pthread_create(&(tid[7]), NULL, &stats_reader, (void*) &info_re1);
+	
 	
 	// Join broker threads
 	void * res;
@@ -62,6 +63,9 @@ int main(int argc, char * argv[]){
 	
 	// Join the rest of the threads
 	pthread_join(tid[3],&res);
+
+	// Join readers threads
+	pthread_join(tid[])
 	
 	// Print final statistics of the market
 	print_market_status(&market_madrid);
