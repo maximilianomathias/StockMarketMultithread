@@ -6,6 +6,7 @@
 
 pthread_mutex_t lock; 
 pthread_cond_t cond; 
+pthread_cond_t cond2;
 int QueueBusy = 0; // this will determine wather the queue is availabe for the reader to read. 
 // int number of readers? 
 
@@ -13,6 +14,7 @@ int QueueBusy = 0; // this will determine wather the queue is availabe for the r
 void init_concurrency_mechanisms(){
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&cond, NULL);
+    pthread_cond_init(&cond2, NULL);
     printf("------>init concurrency mechanisns ok \n");
 }
 
@@ -20,7 +22,8 @@ void init_concurrency_mechanisms(){
 void destroy_concurrency_mechanisms(){
     pthread_mutex_destroy(&lock);
     pthread_cond_destroy(&cond);
-     printf("------>destroy concurrency mechanisns ok \n");
+    pthread_cond_destroy(&cond2);
+    printf("------>destroy concurrency mechanisns ok \n");
 }
 
 void* broker(void* args){
@@ -64,11 +67,12 @@ void* broker(void* args){
                 
             if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
                 return -1; // if it fails, we interrupt the program
-            
+            sleep(2);
             //*****************************+
             //*****************************+ CRITICAL AREA FINISH
             //*****************************+
             pthread_cond_signal(&cond);
+            pthread_cond_signal(&cond2);
             pthread_mutex_unlock(&lock);
             operation_check =  next_operation(_iterator, _operation->id, &_operation->type, &_operation->num_shares, &_operation->share_price);
         }
@@ -77,66 +81,68 @@ void* broker(void* args){
 }
 
 void* operation_executer(void* args){
+
+    // we declare the main data structures that the broker need to interact with
+    struct operation* _operation = (operation *) malloc(sizeof(operation));
+    struct exec_info* _operationExec = (exec_info*) args;
+    struct stock_market* _stock_marquetEx = _operationExec->market;
+
+    //variables
+    int* exit_OpExe = _operationExec->exit;
+    int operation_check;
+    int proc_operation;
+
+    //*****************************+
+    //*****************************+ CRITICAL AREA START
+    //*****************************+
+    pthread_mutex_lock(_operationExec->exit_mutex);
+
+    while(*exit_OpExe != 1){
+        pthread_mutex_unlock(_operationExec->exit_mutex);
+        pthread_mutex_lock(&lock);
+
+        while(operations_queue_empty(_stock_marquetEx->stock_operations) == 1){
+            pthread_cond_wait(&cond2, &lock);
+        }
+
+        operation_check = dequeue_operation(_stock_marquetEx->stock_operations, _operation);
+        //Check
+        if(operation_check == -1){
+            perror("Error in dequeue_operation()");
+            exit(-1);
+        }
+        proc_operation =  process_operation(_stock_marquetEx, _operation);
+        //Check
+        if(proc_operation == -1){
+            perror("Error in process_operation()");
+            exit(-1);
+        }
+        sleep(2);
+        //*****************************+
+        //*****************************+ CRITICAL AREA FINISH
+        //*****************************+
+        pthread_cond_signal(&cond);
+        pthread_cond_signal(&cond2);
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_lock(_operationExec->exit_mutex);
+    }
+    pthread_mutex_unlock(_operationExec->exit_mutex);
     
-}
-
-/*
-void* operation_executer(void * args){
-
-  //Variables
-  struct operation * deqop =(operation *) malloc(sizeof(operation));
-  int procheck, deqcheck;
-  exec_info * operexec = (exec_info*) args;
-  stock_market* curr_market = operexec->market;
-  //operexec->exit_mutex;
-  //While flag exit not active, start executing operations in the queue
-  pthread_mutex_lock(operexec->exit_mutex);
-  int* exitop = operexec->exit;
-  while(*exitop != 1){
-    pthread_mutex_unlock(operexec->exit_mutex);
-    //puede que haya un mutex_lock del exit
-    pthread_mutex_lock(&queuemutex);
-    while(operations_queue_empty(curr_market->stock_operations) == 1){
-      pthread_cond_wait(&dequeuecond, &queuemutex);
-    }
-      //First we dequeue the operation in the top of the queue
-      //And we store it in a operation variable "deqop"
-      deqcheck = dequeue_operation(curr_market->stock_operations, deqop);
-      //Check
-      if(deqcheck == -1){
-        perror("Error in dequeue_operation()");
-        exit(-1);
-      }
-      //Once we have the operation, we process it
-      procheck =  process_operation(curr_market, deqop);
-      //Check
-      if(procheck == -1){
-        perror("Error in process_operation()");
-        exit(-1);
-      }
-      pthread_cond_signal(&enqueuecond);
-      pthread_cond_signal(&dequeuecond);
-      pthread_mutex_unlock(&queuemutex);
-      pthread_mutex_lock(operexec->exit_mutex);
-  }
-  pthread_mutex_unlock(operexec->exit_mutex);
-
-      //When the flag exit is active, we have to close the Op_Ex,
+        //When the flag exit is active, we have to close the Op_Ex,
       //Before closing, we need to process all operations remaining in the queue
-  while(operations_queue_empty(curr_market->stock_operations) == 0){
-    pthread_mutex_lock(&queuemutex);
-      dequeue_operation(curr_market->stock_operations, deqop);
-      if(deqcheck == -1){
-        perror("Error in dequeue_operation()");
-        exit(-1);
-      }
-      procheck =  process_operation(curr_market, deqop);
-      if(procheck == -1){
-        perror("Error in process_operation()");
-        exit(-1);
-      }
-      pthread_mutex_unlock(&queuemutex);
-    }
-
+    while(operations_queue_empty(_stock_marquetEx->stock_operations) == 0){
+        pthread_mutex_lock(&lock);
+        dequeue_operation(_stock_marquetEx->stock_operations, _operation);
+        if(operation_check == -1){
+            perror("Error in dequeue_operation()");
+            exit(-1);
+        }
+        proc_operation =  process_operation(_stock_marquetEx, _operation);
+        if(proc_operation == -1){
+            perror("Error in process_operation()");
+            exit(-1);
+        }
+        pthread_mutex_unlock(&lock);
+        }
 }
-*/
+

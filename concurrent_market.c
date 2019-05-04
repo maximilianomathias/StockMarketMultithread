@@ -8,7 +8,7 @@
 int main(int argc, char * argv[]){
 	pthread_t tid[2];
 	stock_market market_madrid;
-	//int exit = 0;
+	int exit = 0;
 	pthread_mutex_t exit_mutex;
 
 	// Init market and concurrency mechanisms
@@ -22,10 +22,10 @@ int main(int argc, char * argv[]){
 	info_b1.market = &market_madrid;
 
 	// Init exec_info structure for the operation_executer thread
-	/*exec_info info_ex1;
+	exec_info info_ex1;
 	info_ex1.market = &market_madrid;
 	info_ex1.exit = &exit;
-	info_ex1.exit_mutex = &exit_mutex;*/
+	info_ex1.exit_mutex = &exit_mutex;
 	
 	// Init reader_info for the stats_reader thread
 	//reader_info info_re1;
@@ -37,7 +37,7 @@ int main(int argc, char * argv[]){
 	
 	// Create broker and exec threads
 	pthread_create(&(tid[0]), NULL, &broker, (void*) &info_b1);
-	//pthread_create(&(tid[1]), NULL, &operation_executer, (void*) &info_ex1);
+	pthread_create(&(tid[1]), NULL, &operation_executer, (void*) &info_ex1);
 
 	
 	// Join broker threads
@@ -46,7 +46,7 @@ int main(int argc, char * argv[]){
 
 	// Put exit flag = 1 after brokers completion
 	pthread_mutex_lock(&exit_mutex);
-	//exit = 1;
+	exit = 1;
 	pthread_mutex_unlock(&exit_mutex);
 	
 	// Join the rest of the threads
