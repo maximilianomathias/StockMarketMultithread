@@ -42,22 +42,32 @@ void* broker(void* args){
         printf("------->SUCCESS ITERATOR\n"); // DEBUG ONLY
         // this retruns the muiber of successfull arguments manipulated through fscanf
         operation_check = next_operation(_iterator, _operation->id, &_operation->type, &_operation->num_shares, &_operation->share_price);
-        while(operation_check != EOF){ // could use EOF
+
+        // we keep reading the batch file until we reach the end of the file
+        while(operation_check != EOF){ 
             printf("------->OPEARTION CHECK--->%d\n", operation_check);
             printf("------->OPEARTION CHECK--->%s - %d- %d-  %d\n", _operation->id, _operation->type, _operation->num_shares, _operation->share_price);
 
             new_operation(_newOperation, _operation->id, _operation->type, _operation->num_shares, _operation->share_price);
             printf("------->NEW OPEARTION CHECK--->%s - %d- %d-  %d\n", _newOperation->id, _newOperation->type, _newOperation->num_shares, _newOperation->share_price);
+            
+            //*****************************+
+            //*****************************+ CRITICAL AREA START
+            //*****************************+
             pthread_mutex_lock(&lock);
 
+            // we wait while the queue is full. 
             while (operations_queue_full(_stock_marquet->stock_operations) == 1){
                 printf("-------->operations_queue_full\n"); // this means that the queue is full 
                 pthread_cond_wait(&cond,&lock);
             }
                 
-            if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0){
+            if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
                 return -1; // if it fails, we interrupt the program
-            }
+            
+            //*****************************+
+            //*****************************+ CRITICAL AREA FINISH
+            //*****************************+
             pthread_cond_signal(&cond);
             pthread_mutex_unlock(&lock);
             operation_check =  next_operation(_iterator, _operation->id, &_operation->type, &_operation->num_shares, &_operation->share_price);
