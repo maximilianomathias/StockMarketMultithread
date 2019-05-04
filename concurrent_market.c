@@ -6,7 +6,7 @@
 
 
 int main(int argc, char * argv[]){
-	pthread_t tid[2];
+	pthread_t tid[10];
 	stock_market market_madrid;
 	int exit = 0;
 	pthread_mutex_t exit_mutex;
@@ -37,12 +37,23 @@ int main(int argc, char * argv[]){
 	
 	// Create broker and exec threads
 	pthread_create(&(tid[0]), NULL, &broker, (void*) &info_b1);
-	pthread_create(&(tid[1]), NULL, &operation_executer, (void*) &info_ex1);
+	pthread_create(&(tid[1]), NULL, &broker, (void*) &info_b1);
+	pthread_create(&(tid[2]), NULL, &broker, (void*) &info_b1);
+	pthread_create(&(tid[4]), NULL, &broker, (void*) &info_b1);
+
+	/*or(int i = 0; i < 10; i++){
+		pthread_create(&(tid[i]), NULL, &operation_executer, (void*) &info_ex1);
+	}*/
+	pthread_create(&(tid[3]), NULL, &operation_executer, (void*) &info_ex1);
 
 	
 	// Join broker threads
 	void * res;
 	pthread_join(tid[0],&res);
+	pthread_join(tid[1],&res);
+	pthread_join(tid[2],&res);
+	pthread_join(tid[4],&res);
+
 
 	// Put exit flag = 1 after brokers completion
 	pthread_mutex_lock(&exit_mutex);
@@ -50,7 +61,7 @@ int main(int argc, char * argv[]){
 	pthread_mutex_unlock(&exit_mutex);
 	
 	// Join the rest of the threads
-	pthread_join(tid[1],&res);
+	pthread_join(tid[3],&res);
 	
 	// Print final statistics of the market
 	print_market_status(&market_madrid);

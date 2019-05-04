@@ -5,10 +5,14 @@
 #include <pthread.h>
 
 pthread_mutex_t lock; 
-pthread_cond_t cond; 
-pthread_cond_t cond2;
+pthread_cond_t BrokercCond; 
+pthread_cond_t OperationsCond;
 int QueueBusy = 0; // this will determine wather the queue is availabe for the reader to read. 
-// int number of readers? 
+
+
+
+
+
 
 /* Extract information from data received in the pointer void * args -> OK
 Create the iterator on the batch file (new_iterator)
@@ -24,13 +28,12 @@ void* broker(void* args){
     struct operation* _operation = (operation *) malloc(sizeof(operation));
     struct operation* _newOperation = (operation *) malloc(sizeof(operation));
     struct broker_info* _broker = (broker_info*) args;
+    struct stock_market* _stock_marquet = _broker->market;
     struct iterator* _iterator;
-    struct stock_market* _stock_marquet;
 
     // variables 
     char* broker_batch = _broker->batch_file;
     int operation_check;
-    _stock_marquet = _broker->market;
 
     //Create an iterator
     if((_iterator = new_iterator(broker_batch))!= NULL){
@@ -47,28 +50,25 @@ void* broker(void* args){
             pthread_mutex_lock(&lock);
             
             // we wait while the queue is full. 
-            while (/*operations_queue_full(_stock_marquet->stock_operations) == 1 && */QueueBusy == 1){
-                pthread_cond_wait(&cond,&lock);
-                printf("--------_>BROKER WAITING:...........");
-            }
-                
-            
-            printf("\n\n--------------------------------------_>BROKER STARTS\n\n");    
+            while ( operations_queue_full(_stock_marquet->stock_operations) == 1 )
+                pthread_cond_wait(&BrokercCond,&lock);
+
+            // Fill the queue with a new element in the back.
             if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
                 return -1;
-            sleep(2); // DEBUG ONLY 
-            QueueBusy = 1;
-            pthread_cond_signal(&cond);
-            //pthread_cond_signal(&cond2);
-            pthread_mutex_unlock(&lock);
-            //****************************************************************************************+ CRITICAL AREA FINISH
             
+            pthread_cond_signal(&BrokercCond); // Broker conditional variable 
+            pthread_cond_signal(&OperationsCond); // Operations Executer conditional variable
+            pthread_mutex_unlock(&lock); // Release the main mutex. 
+            //****************************************************************************************+ CRITICAL AREA FINISH
+            sleep(1); // DEBUG ONLY 
             operation_check =  next_operation(  _iterator, _operation->id, &_operation->type, 
                                                 &_operation->num_shares, &_operation->share_price);
-        }
-    }
+        }//while
+    }// if
+    // Clore the file and free resoruces
     destroy_iterator(_iterator);
-}
+}// broker 
 
 
 
@@ -94,36 +94,34 @@ void* operation_executer(void* args){
     int* exit_OpExe = _operationExec->exit;
     int operation_check;
     int proc_operation;
-
+    
     //****************************************************************************************+ CRITICAL ARE START
-  
-    //pthread_mutex_lock(_operationExec->exit_mutex);
-
+    pthread_mutex_lock(_operationExec->exit_mutex); // we lock this mutex in order to have one operation running at the time
+    
     while(*exit_OpExe != 1){ // while tehe xit flag is not active
-
-        //pthread_mutex_unlock(_operationExec->exit_mutex);
+        
+        pthread_mutex_unlock(_operationExec->exit_mutex);
         pthread_mutex_lock(&lock);
-
-        while(/*operations_queue_empty(_stock_marquetEx->stock_operations) == 1 && */QueueBusy == 0){
-            pthread_cond_wait(&cond, &lock);
-        }
-
+        
+        while( operations_queue_empty(_stock_marquetEx->stock_operations) == 1 )
+            pthread_cond_wait(&OperationsCond, &lock);
+        
         operation_check = dequeue_operation(_stock_marquetEx->stock_operations, _operation);
         proc_operation =  process_operation(_stock_marquetEx, _operation);
-
-        printf("\n\n--------------------------------------_>OPETARION EXECUTER\n\n");
-        sleep(2);
-        QueueBusy = 0; 
-        pthread_cond_signal(&cond);
-        //pthread_cond_signal(&cond2);
+        sleep(1);
+        
+        pthread_cond_signal(&OperationsCond);
+        pthread_cond_signal(&BrokercCond);
         pthread_mutex_unlock(&lock);
-        //pthread_mutex_lock(_operationExec->exit_mutex);
+        pthread_mutex_lock(_operationExec->exit_mutex);
+       
         //****************************************************************************************+ CRITICAL AREA FINISH
     }
-    //pthread_mutex_unlock(_operationExec->exit_mutex);
+    pthread_mutex_unlock(_operationExec->exit_mutex);
     
     //When the flag exit is active, we have to close the Op_Ex,
     //Before closing, we need to process all operations remaining in the queue
+    /*
     while(operations_queue_empty(_stock_marquetEx->stock_operations) == 0){
         pthread_mutex_lock(&lock);
         dequeue_operation(_stock_marquetEx->stock_operations, _operation);
@@ -137,22 +135,22 @@ void* operation_executer(void* args){
             exit(-1);
         }
         pthread_mutex_unlock(&lock);
-        }
-}
+        }*/
+}//operation_executer
 
 
 // initialization of the mutex and condition variables
 void init_concurrency_mechanisms(){
     pthread_mutex_init(&lock, NULL);
-    pthread_cond_init(&cond, NULL);
-    pthread_cond_init(&cond2, NULL);
+    pthread_cond_init(&BrokercCond , NULL);
+    pthread_cond_init(&OperationsCond, NULL);
     printf("------>init concurrency mechanisns ok \n");
 }
 
 // Deallocate memory for the mutex and condition variables 
 void destroy_concurrency_mechanisms(){
     pthread_mutex_destroy(&lock);
-    pthread_cond_destroy(&cond);
-    pthread_cond_destroy(&cond2);
+    pthread_cond_destroy(&BrokercCond);
+    pthread_cond_destroy(&OperationsCond);
     printf("------>destroy concurrency mechanisns ok \n");
 }
