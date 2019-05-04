@@ -12,9 +12,9 @@ int main(int argc, char * argv[]){
 	pthread_mutex_t exit_mutex;
 
 	// Init market and concurrency mechanisms
-	init_market(&market_madrid, "stocks.txt");
-	init_concurrency_mechanisms();
-	pthread_mutex_init(&exit_mutex,NULL);
+	init_market(&market_madrid, "stocks.txt"); // sets all the values to zero. 
+	init_concurrency_mechanisms(); // initialization of the mutex and condition variables
+	pthread_mutex_init(&exit_mutex,NULL); // 
 	
 	// Init broker_info structure for the broker thread
 	broker_info info_b1;
@@ -22,7 +22,7 @@ int main(int argc, char * argv[]){
 	info_b1.market = &market_madrid;
 
 	// Init exec_info structure for the operation_executer thread
-	/*struct exec_info info_ex1;
+	/*exec_info info_ex1;
 	info_ex1.market = &market_madrid;
 	info_ex1.exit = &exit;
 	info_ex1.exit_mutex = &exit_mutex;*/
