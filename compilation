@@ -1,0 +1,4 @@
+lib/parser.c: In function ‘print_trace’:
+lib/parser.c:62:2: warning: implicit declaration of function ‘gettimeofday’ [-Wimplicit-function-declaration]
+  gettimeofday(&t1, NULL);
+  ^
