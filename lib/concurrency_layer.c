@@ -7,6 +7,7 @@
 pthread_mutex_t lock; 
 pthread_cond_t BrokercCond; 
 pthread_cond_t OperationsCond;
+pthread_cond_t ReaderCond;
 int QueueBusy = 0; // this will determine wather the queue is availabe for the reader to read. 
 
 
@@ -47,16 +48,16 @@ void* broker(void* args){
             
             // Waiting while the queue is full. 
             while ( operations_queue_full(_stock_marquet->stock_operations) == 1 )
-                pthread_cond_wait(&BrokercCond,&lock);
-        
-            // Filling the queue with a new element in the back.
+                pthread_cond_wait(&OperationsCond,&lock);
+            QueueBusy = 1; // let the predicate know that the queue is being used.
+            // Filling the queue with a new element in the back. Exit he program if returns a negative value
             if((enqueue_operation(_stock_marquet->stock_operations, _newOperation))<0)
-                return -1;
-            sleep(2);
+                exit(-1);
             
             pthread_cond_signal(&BrokercCond); // Broker conditional variable 
-            pthread_cond_signal(&OperationsCond); // Operations Executer conditional variable
+            pthread_cond_signal(&ReaderCond); // Let the reader now that the operation finished 
             pthread_mutex_unlock(&lock); // Release the main mutex. 
+            QueueBusy = 0;
             //****************************************************************************************+ CRITICAL AREA FINISH
             sleep(1); // DEBUG ONLY 
             operation_check =  next_operation(  _iterator, _operation->id, &_operation->type, 
@@ -87,19 +88,18 @@ void* stats_reader(void * args){
         pthread_mutex_unlock(reader->exit_mutex);
 
         while(QueueBusy == 1){
-            pthread_cond_wait(&BrokercCond,&lock);
+            pthread_cond_wait(&ReaderCond,&lock);
         }
-        
         pthread_mutex_unlock(&lock);
         // Execute the query
-        printf("----------------_> FROM READER\n\n");
         print_market_status(curr_market);
         usleep(reader->frequency);
         sleep(2);
         pthread_mutex_lock(&lock);
         
-        pthread_cond_signal(&BrokercCond);
-        pthread_mutex_unlock(&lock);
+        pthread_cond_signal(&BrokercCond); // Notify the Broker that the reading finished
+        pthread_cond_signal(&OperationsCond); // Notify the Operation Exec that the reading finished
+        pthread_mutex_unlock(&lock); // release the mutex
     }
 }
 
@@ -122,7 +122,7 @@ void* operation_executer(void* args){
     int proc_operation;
     
     //****************************************************************************************+ CRITICAL ARE START
-    pthread_mutex_lock(_operationExec->exit_mutex); // we lock this mutex in order to have one operation running at the time
+   // pthread_mutex_lock(_operationExec->exit_mutex); // we lock this mutex in order to have one operation running at the time
     
     while(*exit_OpExe != 1){ // while tehe xit flag is not active
         
@@ -130,24 +130,22 @@ void* operation_executer(void* args){
         pthread_mutex_lock(&lock);
         
         while( operations_queue_empty(_stock_marquetEx->stock_operations) == 1 )
-            pthread_cond_wait(&OperationsCond, &lock);
-        
+            pthread_cond_wait(&BrokercCond, &lock);
+        QueueBusy = 1;
         operation_check = dequeue_operation(_stock_marquetEx->stock_operations, _operation);
         proc_operation =  process_operation(_stock_marquetEx, _operation);
         sleep(2);
-        
-        pthread_cond_signal(&OperationsCond);
+        QueueBusy = 0;
+        pthread_cond_signal(&ReaderCond);
         pthread_cond_signal(&BrokercCond);
         pthread_mutex_unlock(&lock);
         pthread_mutex_lock(_operationExec->exit_mutex);
-       
+
         //****************************************************************************************+ CRITICAL AREA FINISH
     }
-    pthread_mutex_unlock(_operationExec->exit_mutex);
+    //pthread_mutex_unlock(_operationExec->exit_mutex);
     
-    // When the flag exit is active, we have to close the Op_Ex,
-    // Before closing, we need to process all operations remaining in the queue
-    
+    // Checks if there´s remainin operation to be executed before finishing.
     while(operations_queue_empty(_stock_marquetEx->stock_operations) == 0){
         pthread_mutex_lock(&lock);
         
@@ -156,7 +154,7 @@ void* operation_executer(void* args){
             return -1;    
         
         pthread_mutex_unlock(&lock);
-        }
+    }
 }//operation_executer
 
 // initialization of the mutex and condition variables
@@ -164,7 +162,7 @@ void init_concurrency_mechanisms(){
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&BrokercCond , NULL);
     pthread_cond_init(&OperationsCond, NULL);
-    printf("------>init concurrency mechanisns ok \n");
+    pthread_cond_init(&ReaderCond, NULL);
 }
 
 // Deallocate memory for the mutex and condition variables 
@@ -172,5 +170,5 @@ void destroy_concurrency_mechanisms(){
     pthread_mutex_destroy(&lock);
     pthread_cond_destroy(&BrokercCond);
     pthread_cond_destroy(&OperationsCond);
-    printf("------>destroy concurrency mechanisns ok \n");
+    pthread_cond_destroy(&ReaderCond);
 }

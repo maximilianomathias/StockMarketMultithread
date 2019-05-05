@@ -67,7 +67,7 @@ int main(int argc, char * argv[]){
 	
 	pthread_join(tidOpExec[0],&res); // Join the Operation executer threads
 
-	for(int i = 0; i < BROKERS; i++) // Join readers threads
+	for(int i = 0; i < STATS_READERS; i++) // Join readers threads
 		pthread_join(tidStatReaders[i], &res);
 
 	print_market_status(&market_madrid); // Print final statistics of the market
