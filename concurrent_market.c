@@ -3,23 +3,33 @@
 #include <stdio.h>
 #include <pthread.h>
 
-
+#define BROKERS 1
+#define OPERATORS 1
+#define STATS_READERS 1
 
 int main(int argc, char * argv[]){
-	pthread_t tid[10];
+
+	pthread_t tidBrokers[BROKERS];
+	pthread_t tidOpExec[OPERATORS];
+	pthread_t tidStatReaders[STATS_READERS];
+	pthread_mutex_t exit_mutex;
+
 	stock_market market_madrid;
 	int exit = 0;
-	pthread_mutex_t exit_mutex;
 
 	// Init market and concurrency mechanisms
 	init_market(&market_madrid, "stocks.txt"); // sets all the values to zero. 
 	init_concurrency_mechanisms(); // initialization of the mutex and condition variables
-	pthread_mutex_init(&exit_mutex,NULL); // 
+	pthread_mutex_init(&exit_mutex,NULL); 
 	
 	// Init broker_info structure for the broker thread
 	broker_info info_b1;
 	strcpy(info_b1.batch_file, "batch_operations.txt");
 	info_b1.market = &market_madrid;
+
+	broker_info info_b2;
+	strcpy(info_b2.batch_file, "batch_operations.txt");
+	info_b2.market = &market_madrid;
 
 	// Init exec_info structure for the operation_executer thread
 	exec_info info_ex1;
@@ -35,45 +45,37 @@ int main(int argc, char * argv[]){
 	info_re1.frequency = 100000;
 
 	
-	// Create broker and exec threads
-	pthread_create(&(tid[0]), NULL, &broker, (void*) &info_b1);
-	pthread_create(&(tid[1]), NULL, &broker, (void*) &info_b1);
-	pthread_create(&(tid[2]), NULL, &broker, (void*) &info_b1);
-	pthread_create(&(tid[4]), NULL, &broker, (void*) &info_b1);
+	// Create broker 
+	for(int i = 0; i < BROKERS; i++)
+		pthread_create(&(tidBrokers[i]), NULL, &broker, (void*) &info_b1);
 
-	pthread_create(&(tid[3]), NULL, &operation_executer, (void*) &info_ex1);
+	// Create Operation Exec 
+	pthread_create(&(tidOpExec[0]), NULL, &operation_executer, (void*) &info_ex1);
 
-	pthread_create(&(tid[5]), NULL, &stats_reader, (void*) &info_re1);
-	pthread_create(&(tid[6]), NULL, &stats_reader, (void*) &info_re1);
-	pthread_create(&(tid[7]), NULL, &stats_reader, (void*) &info_re1);
-	
-	
-	// Join broker threads
+	// Create Stats Readers
+	for(int i = 0; i < STATS_READERS; i++)
+		pthread_create(&(tidStatReaders[i]), NULL, &stats_reader, (void*) &info_re1);
+
 	void * res;
-	pthread_join(tid[0],&res);
-	pthread_join(tid[1],&res);
-	pthread_join(tid[2],&res);
-	pthread_join(tid[4],&res);
-
-
-	// Put exit flag = 1 after brokers completion
+	
+	for(int i = 0; i < BROKERS; i++) // Join broker threads
+		pthread_join(tidBrokers[i],&res);
+	
 	pthread_mutex_lock(&exit_mutex);
-	exit = 1;
+	exit = 1;	// Put exit flag = 1 after brokers completion
 	pthread_mutex_unlock(&exit_mutex);
 	
-	// Join the rest of the threads
-	pthread_join(tid[3],&res);
+	pthread_join(tidOpExec[0],&res); // Join the Operation executer threads
 
-	// Join readers threads
-	pthread_join(tid[])
+	for(int i = 0; i < BROKERS; i++) // Join readers threads
+		pthread_join(tidStatReaders[i], &res);
+
+	print_market_status(&market_madrid); // Print final statistics of the market
 	
-	// Print final statistics of the market
-	print_market_status(&market_madrid);
+	delete_market(&market_madrid); // Destroy market and concurrency mechanisms
+	destroy_concurrency_mechanisms(); // Destroy the threads
+	pthread_mutex_destroy(&exit_mutex); // Destroy the mutex used in the main function
 	
-	// Destroy market and concurrency mechanisms
-	delete_market(&market_madrid);
-	destroy_concurrency_mechanisms();
-	pthread_mutex_destroy(&exit_mutex);
 
 	return 0;
 }
