@@ -1,6 +1,6 @@
 #include "../include/concurrency_layer.h"
 
-#define BROKERS 0
+#define BROKERS 1
 #define OPERATORS 1
 #define STATS_READERS 1
 
