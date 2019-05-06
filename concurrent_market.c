@@ -1,9 +1,6 @@
 #include "../include/concurrency_layer.h"
-#include <sys/time.h>
-#include <stdio.h>
-#include <pthread.h>
 
-#define BROKERS 1
+#define BROKERS 0
 #define OPERATORS 1
 #define STATS_READERS 1
 
@@ -26,10 +23,6 @@ int main(int argc, char * argv[]){
 	broker_info info_b1;
 	strcpy(info_b1.batch_file, "batch_operations.txt");
 	info_b1.market = &market_madrid;
-
-	broker_info info_b2;
-	strcpy(info_b2.batch_file, "batch_operations.txt");
-	info_b2.market = &market_madrid;
 
 	// Init exec_info structure for the operation_executer thread
 	exec_info info_ex1;
